@@ -1,0 +1,51 @@
+# ── Detection ─────────────────────────────────────────────────────────────────
+detection:
+  model_path: models/exported/best.pt
+  confidence_threshold: 0.25      # Lower = more detections, more false positives
+  iou_threshold: 0.45             # NMS IoU threshold
+  imgsz: 640                      # Inference image size (px)
+  device: ""                      # "" = auto-select (GPU if available, else CPU)
+
+# ── Tracking ──────────────────────────────────────────────────────────────────
+tracking:
+  tracker_config: configs/bytetrack.yaml
+  persist: true                   # Keep tracker state across frames
+
+# ── Counting ──────────────────────────────────────────────────────────────────
+counting:
+  min_track_frames: 15            # Minimum consecutive frames to count an object
+  min_track_seconds: 0.5          # Equivalent minimum in seconds (whichever is higher)
+
+  method1:                        # Line-crossing counter
+    enabled: true
+    line_position: 0.5            # Position of the virtual line (0.0–1.0 of frame dimension)
+    line_orientation: horizontal  # "horizontal" or "vertical"
+
+  method2:                        # Global unique ID counter
+    enabled: true
+
+# ── Yield Estimation ──────────────────────────────────────────────────────────
+yield:
+  avg_apple_weight_g: 180.0       # Average apple weight in grams
+
+# ── Video Processing ──────────────────────────────────────────────────────────
+video:
+  max_file_size_mb: 50
+  output_fps: null                # null = match input FPS
+  output_codec: mp4v              # FourCC codec for processed video output
+  draw_tracks: true               # Render track trails on output video
+  trail_length: 30                # Number of past positions to draw in trail
+
+# ── Training (reference values — set per Kaggle run) ─────────────────────────
+training:
+  epochs: 100
+  batch: 16
+  imgsz: 640
+  patience: 10                    # Early stopping patience
+  lr0: 0.01                       # Initial learning rate
+  lrf: 0.01                       # Final LR fraction (cosine schedule)
+  mosaic: 1.0
+  mixup: 0.1
+  flipud: 0.0
+  fliplr: 0.5
+  hsv_v: 0.4                      # Brightness augmentation range

@@ -1,0 +1,15 @@
+# Streamlit app runtime dependencies only.
+# Used by Dockerfile — keeps the image lean.
+
+torch>=2.3.0
+torchvision>=0.18.0
+ultralytics>=8.3.0
+supervision>=0.21.0
+opencv-python-headless>=4.9.0
+Pillow>=10.3.0
+numpy>=1.26.0
+pandas>=2.2.0
+pyyaml>=6.0.1
+streamlit>=1.35.0
+plotly>=5.22.0
+tqdm>=4.66.0

@@ -1,0 +1,37 @@
+# ── Core ML ───────────────────────────────────────────────────────────────────
+# PyTorch: install separately via https://pytorch.org/get-started/locally/
+# to match your local CUDA version. Example (CUDA 12.1):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+torch>=2.3.0
+torchvision>=0.18.0
+
+# YOLO11 + native ByteTrack tracking
+ultralytics>=8.3.0
+
+# Computer vision utilities (line-zone counting, annotation drawing, tracking helpers)
+supervision>=0.21.0
+
+# ── Computer Vision ───────────────────────────────────────────────────────────
+opencv-python>=4.9.0
+Pillow>=10.3.0
+
+# ── Data & Config ─────────────────────────────────────────────────────────────
+numpy>=1.26.0
+pandas>=2.2.0
+pyyaml>=6.0.1
+
+# ── App ───────────────────────────────────────────────────────────────────────
+streamlit>=1.35.0
+
+# ── Visualisation ─────────────────────────────────────────────────────────────
+matplotlib>=3.8.0
+seaborn>=0.13.0
+plotly>=5.22.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+tqdm>=4.66.0
+scipy>=1.13.0
+
+# ── Development ───────────────────────────────────────────────────────────────
+jupyterlab>=4.2.0
+ipywidgets>=8.1.0

@@ -1,0 +1,10 @@
+# ByteTrack configuration for Ultralytics model.track()
+# Reference: https://docs.ultralytics.com/modes/track/
+
+tracker_type: bytetrack
+
+track_high_thresh: 0.25     # Score threshold for high-confidence detections (first association)
+track_low_thresh: 0.05      # Score threshold for low-confidence detections (second association)
+new_track_thresh: 0.25      # Minimum score to initialise a new track
+track_buffer: 30            # Frames to keep a lost track alive before removing it
+match_thresh: 0.8           # IoU threshold for track-detection matching
