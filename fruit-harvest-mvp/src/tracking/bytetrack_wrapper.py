@@ -42,12 +42,16 @@ class TrackedObject:
 
     @property
     def cx(self) -> float:
-        """Centre x coordinate."""
+        """
+        Centre x coordinate.
+        """
         return float((self.bbox_xyxy[0] + self.bbox_xyxy[2]) / 2)
 
     @property
     def cy(self) -> float:
-        """Centre y coordinate."""
+        """
+        Centre y coordinate.
+        """
         return float((self.bbox_xyxy[1] + self.bbox_xyxy[3]) / 2)
 
     @property
@@ -74,10 +78,25 @@ def parse_tracking_results(results: Results, frame_idx: int) -> list[TrackedObje
         One TrackedObject per active track in the frame.
         Returns an empty list if no tracked detections are present.
     """
-    # TODO: Implement during Phase 3
-    # Hints:
-    #   results.boxes.xyxy  → tensor of [x1,y1,x2,y2]
-    #   results.boxes.id    → tensor of track IDs (may be None if no detections)
-    #   results.boxes.conf  → tensor of confidence scores
-    #   results.boxes.cls   → tensor of class IDs
-    raise NotImplementedError
+    # Guard: no detections or tracker not yet initialised
+    if results.boxes is None or results.boxes.id is None:
+        return []
+
+    boxes   = results.boxes.xyxy.cpu().numpy()   # (N, 4) float32
+    ids     = results.boxes.id.cpu().numpy()      # (N,)   float32
+    confs   = results.boxes.conf.cpu().numpy()    # (N,)   float32
+    classes = results.boxes.cls.cpu().numpy()     # (N,)   float32
+
+    tracked_objects: list[TrackedObject] = []
+    for box, track_id, conf, cls_id in zip(boxes, ids, confs, classes):
+        tracked_objects.append(
+            TrackedObject(
+                track_id=int(track_id),
+                bbox_xyxy=box,
+                confidence=float(conf),
+                class_id=int(cls_id),
+                frame_idx=frame_idx
+            )
+        )
+
+    return tracked_objects

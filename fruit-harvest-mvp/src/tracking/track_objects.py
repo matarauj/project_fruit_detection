@@ -10,7 +10,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from src.tracking.bytetrack_wrapper import TrackedObject
+from src.tracking.bytetrack_wrapper import TrackedObject, parse_tracking_results
 
 
 # Track history: track_id → list of (frame_idx, cx, cy)
@@ -19,8 +19,8 @@ TrackHistory = dict[int, list[tuple[int, float, float]]]
 
 def update_track_history(
     tracked_objects: list[TrackedObject],
-    history: TrackHistory,
-) -> TrackHistory:
+    history: TrackHistory
+    ) -> TrackHistory:
     """
     Append the current-frame positions of all active tracks to the history.
 
@@ -37,8 +37,12 @@ def update_track_history(
     TrackHistory
         Updated history (same object, mutated in-place).
     """
-    # TODO: Implement during Phase 3
-    raise NotImplementedError
+    for obj in tracked_objects:
+        if obj.track_id not in history:
+            history[obj.track_id] = []
+        history[obj.track_id].append((obj.frame_idx, obj.cx, obj.cy))
+
+    return history
 
 
 def track_frame(
@@ -46,7 +50,7 @@ def track_frame(
     frame: np.ndarray,
     frame_idx: int,
     history: TrackHistory,
-) -> tuple[list[TrackedObject], TrackHistory]:
+    ) -> tuple[list[TrackedObject], TrackHistory]:
     """
     Run detection + tracking on one frame and update the history.
 
@@ -66,9 +70,13 @@ def track_frame(
     tuple[list[TrackedObject], TrackHistory]
         Active tracked objects in this frame, and the updated history.
     """
-    # TODO: Implement during Phase 3
-    # 1. Call detector.track_frame(frame)
-    # 2. Call parse_tracking_results(results, frame_idx)
-    # 3. Call update_track_history(tracked_objects, history)
-    # 4. Return (tracked_objects, history)
-    raise NotImplementedError
+    # 1. Run detection + ByteTrack via the FruitDetector
+    results = detector.track_frame(frame)
+
+    # 2. Normalise Ultralytics output into TrackedObject instances
+    tracked_objects = parse_tracking_results(results, frame_idx)
+
+    # 3. Append current positions to the running history
+    update_track_history(tracked_objects, history)
+
+    return tracked_objects, history

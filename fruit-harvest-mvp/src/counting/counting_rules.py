@@ -29,7 +29,7 @@ class LineZone:
     Parameters
     ----------
     position : float
-        Fractional position of the line (0.0–1.0).
+        Fractional position of the line (0.0-1.0).
     orientation : LineOrientation
         Whether the line runs horizontally or vertically.
     frame_width : int
@@ -42,36 +42,48 @@ class LineZone:
     frame_width: int
     frame_height: int
 
+
     @classmethod
     def from_config(
         cls,
         config: dict,
         frame_width: int,
-        frame_height: int,
-    ) -> "LineZone":
-        """Construct from the counting.method1 section of settings.yaml."""
+        frame_height: int
+        ) -> "LineZone":
+        """
+        Construct from the counting.method1 section of settings.yaml.
+        """
         return cls(
             position=config["line_position"],
             orientation=LineOrientation(config["line_orientation"]),
             frame_width=frame_width,
-            frame_height=frame_height,
+            frame_height=frame_height
         )
+
 
     @property
     def pixel_position(self) -> float:
-        """Absolute pixel position of the line."""
+        """
+        Absolute pixel position of the line.
+        """
         if self.orientation == LineOrientation.HORIZONTAL:
             return self.position * self.frame_height
         return self.position * self.frame_width
 
+
     def start_point(self) -> tuple[int, int]:
-        """(x, y) start point for drawing the line."""
+        """
+        (x, y) start point for drawing the line.
+        """
         if self.orientation == LineOrientation.HORIZONTAL:
             return (0, int(self.pixel_position))
         return (int(self.pixel_position), 0)
 
+
     def end_point(self) -> tuple[int, int]:
-        """(x, y) end point for drawing the line."""
+        """
+        (x, y) end point for drawing the line.
+        """
         if self.orientation == LineOrientation.HORIZONTAL:
             return (self.frame_width, int(self.pixel_position))
         return (int(self.pixel_position), self.frame_height)
@@ -80,12 +92,16 @@ class LineZone:
 def has_crossed_line(
     prev_pos: tuple[float, float],
     curr_pos: tuple[float, float],
-    line_zone: LineZone,
-) -> bool:
+    line_zone: LineZone
+    ) -> bool:
     """
     Return True if a track crossed the counting line between two consecutive frames.
 
-    Uses a simple threshold comparison on the relevant coordinate.
+    Uses a sign-flip comparison on the relevant coordinate so that
+    frame-skipping edge cases are handled correctly. A track sitting
+    exactly on the line (side == 0) is treated as having crossed, but
+    the caller is responsible for ensuring each track_id is only counted
+    once (via the _m1_counted set in FruitCounter).
 
     Parameters
     ----------
@@ -96,17 +112,26 @@ def has_crossed_line(
     line_zone : LineZone
         The virtual counting line.
     """
-    # TODO: Implement during Phase 4
-    # Hint: for a horizontal line, check if cy crossed line_zone.pixel_position.
-    # A crossing occurs when the sign of (pos - line) flips between frames.
-    raise NotImplementedError
+    line = line_zone.pixel_position
+
+    if line_zone.orientation == LineOrientation.HORIZONTAL:
+        prev_side = prev_pos[1] - line   # cy component
+        curr_side = curr_pos[1] - line
+    else:
+        prev_side = prev_pos[0] - line   # cx component
+        curr_side = curr_pos[0] - line
+
+    # Sign flip (or touching zero) means a crossing occurred.
+    # prev_side * curr_side <= 0 handles both the exact-zero case and
+    # the common case where the sign changes between frames.
+    return prev_side * curr_side <= 0
 
 
 def is_track_stable(
     track_id: int,
     history: TrackHistory,
-    min_frames: int,
-) -> bool:
+    min_frames: int
+    ) -> bool:
     """
     Return True if the track has been visible for at least `min_frames` frames.
 
@@ -119,5 +144,7 @@ def is_track_stable(
     min_frames : int
         Minimum number of frames required.
     """
-    # TODO: Implement during Phase 4
-    raise NotImplementedError
+    track = history.get(track_id)
+    if track is None:
+        return False
+    return len(track) >= min_frames
