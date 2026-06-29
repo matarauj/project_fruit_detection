@@ -15,7 +15,9 @@ from ultralytics.engine.results import Results
 
 
 class FruitDetector:
-    """Wraps an Ultralytics YOLO model for single-class apple detection."""
+    """
+    Wraps an Ultralytics YOLO model for single-class apple detection.
+    """
 
     def __init__(
         self,
@@ -23,8 +25,8 @@ class FruitDetector:
         conf: float = 0.25,
         iou: float = 0.45,
         imgsz: int = 640,
-        device: str = "",
-    ) -> None:
+        device: str = ""
+        ) -> None:
         """
         Parameters
         ----------
@@ -71,7 +73,7 @@ class FruitDetector:
             iou=self.iou,
             imgsz=self.imgsz,
             device=self.device,
-            verbose=False,
+            verbose=False
         )
         return results[0]
 
@@ -102,12 +104,14 @@ class FruitDetector:
             device=self.device,
             tracker="configs/bytetrack.yaml",
             persist=persist,
-            verbose=False,
+            verbose=False
         )
         return results[0]
 
     def reset_tracker(self) -> None:
-        """Reset the tracker state (call between different video files)."""
+        """
+        Reset the tracker state (call between different video files).
+        """
         # Ultralytics trackers are stateful; re-instantiating the model
         # is the safest reset. A lighter alternative exists in some versions.
         self.model = YOLO(str(self.model_path))
@@ -117,7 +121,9 @@ class FruitDetector:
     # ------------------------------------------------------------------
 
     def warmup(self) -> None:
-        """Run a dummy inference to warm up the model (reduces first-frame latency)."""
+        """
+        Run a dummy inference to warm up the model (reduces first-frame latency).
+        """
         dummy = np.zeros((self.imgsz, self.imgsz, 3), dtype=np.uint8)
         self.model.predict(source=dummy, verbose=False)
 

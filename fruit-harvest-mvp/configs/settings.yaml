@@ -19,7 +19,7 @@ counting:
   method1:                        # Line-crossing counter
     enabled: true
     line_position: 0.5            # Position of the virtual line (0.0–1.0 of frame dimension)
-    line_orientation: horizontal  # "horizontal" or "vertical"
+    line_orientation: vertical    # "horizontal" or "vertical"
 
   method2:                        # Global unique ID counter
     enabled: true

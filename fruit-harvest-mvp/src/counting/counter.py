@@ -52,8 +52,8 @@ class FruitCounter:
         self,
         fps: float,
         min_track_frames: int = 15,
-        line_zone: LineZone | None = None,
-    ) -> None:
+        line_zone: LineZone | None = None
+        ) -> None:
         self.fps = fps
         self.min_track_frames = min_track_frames
         self.line_zone = line_zone
@@ -73,8 +73,8 @@ class FruitCounter:
         self,
         frame_idx: int,
         tracked_objects: list[TrackedObject],
-        history: TrackHistory,
-    ) -> FrameStats:
+        history: TrackHistory
+        ) -> FrameStats:
         """
         Process one frame and update both counters.
 
@@ -92,25 +92,58 @@ class FruitCounter:
         FrameStats
             Snapshot of counts after processing this frame.
         """
-        # TODO: Implement during Phase 4
-        # For each tracked_object:
-        #   - Check if track is stable (is_track_stable)
-        #   - Method 1: check crossing (has_crossed_line), update _m1_counted
-        #   - Method 2: check frame count, update _m2_counted
-        raise NotImplementedError
+        for obj in tracked_objects:
+            tid = obj.track_id
+            stable = is_track_stable(tid, history, self.min_track_frames)
+
+            # ── Method 2: global unique ID ────────────────────────────────
+            if stable and tid not in self._m2_counted:
+                self._m2_counted.add(tid)
+
+            # ── Method 1: line crossing ───────────────────────────────────
+            if (
+                self.line_zone is not None
+                and stable
+                and tid not in self._m1_counted
+                and tid in self._m1_prev_positions
+            ):
+                prev = self._m1_prev_positions[tid]
+                curr = obj.centre
+                if has_crossed_line(prev, curr, self.line_zone):
+                    self._m1_counted.add(tid)
+
+            # Always update previous position for next frame's crossing check
+            self._m1_prev_positions[tid] = obj.centre
+
+        return FrameStats(
+            frame_idx=frame_idx,
+            detections_in_frame=len(tracked_objects),
+            count_m1=self.count_m1,
+            count_m2=self.count_m2,
+            active_tracks=len(tracked_objects)
+        )
+
 
     def reset(self) -> None:
-        """Reset all state (call between videos)."""
+        """
+        Reset all state (call between videos).
+        """
         self._m1_counted.clear()
         self._m1_prev_positions.clear()
         self._m2_counted.clear()
 
+
     @property
     def count_m1(self) -> int:
-        """Total fruit counted by Method 1 (line-crossing)."""
+        """
+        Total fruit counted by Method 1 (line-crossing).
+        """
         return len(self._m1_counted)
+
 
     @property
     def count_m2(self) -> int:
-        """Total fruit counted by Method 2 (global unique ID)."""
+        """
+        Total fruit counted by Method 2 (global unique ID).
+        """
         return len(self._m2_counted)

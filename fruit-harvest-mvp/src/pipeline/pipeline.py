@@ -15,14 +15,18 @@ import numpy as np
 
 from src.utils import load_config
 from src.detection.predict import FruitDetector
+from src.tracking.track_objects import track_frame, TrackHistory
 from src.counting.counter import FruitCounter, FrameStats
-from src.counting.counting_rules import LineZone
+from src.counting.counting_rules import LineZone, LineOrientation
 from src.counting.yield_estimator import YieldEstimator
+from src.pipeline.video_processor import VideoProcessor
 
 
 @dataclass
 class PipelineConfig:
-    """Flat configuration for one pipeline run, populated from settings.yaml."""
+    """
+    Flat configuration for one pipeline run, populated from settings.yaml.
+    """
     model_path: Path
     conf: float = 0.25
     iou: float = 0.45
@@ -31,9 +35,11 @@ class PipelineConfig:
     min_track_frames: int = 15
     avg_apple_weight_g: float = 180.0
     line_position: float = 0.5
-    line_orientation: str = "horizontal"
+    line_orientation: str = "vertical"
     enable_m1: bool = True
     enable_m2: bool = True
+    trail_length: int = 30
+    output_codec: str = "mp4v"
 
     @classmethod
     def from_yaml(cls, config_path: str | Path = "configs/settings.yaml") -> "PipelineConfig":
@@ -50,12 +56,16 @@ class PipelineConfig:
             line_orientation=cfg["counting"]["method1"]["line_orientation"],
             enable_m1=cfg["counting"]["method1"]["enabled"],
             enable_m2=cfg["counting"]["method2"]["enabled"],
+            trail_length=cfg["video"].get("trail_length", 30),
+            output_codec=cfg["video"].get("output_codec", "mp4v")
         )
 
 
 @dataclass
 class PipelineResult:
-    """Final result returned after processing a complete video."""
+    """
+    Final result returned after processing a complete video.
+    """
     total_frames: int
     fps: float
     count_m1: int
@@ -84,7 +94,7 @@ class FruitPipeline:
             conf=config.conf,
             iou=config.iou,
             imgsz=config.imgsz,
-            device=config.device,
+            device=config.device
         )
         self.yield_estimator = YieldEstimator(config.avg_apple_weight_g)
 
@@ -92,11 +102,15 @@ class FruitPipeline:
     def from_yaml(cls, config_path: str | Path = "configs/settings.yaml") -> "FruitPipeline":
         return cls(PipelineConfig.from_yaml(config_path))
 
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
     def run(
         self,
         video_path: str | Path,
-        output_path: str | Path | None = None,
-    ) -> PipelineResult:
+        output_path: str | Path | None = None
+        ) -> PipelineResult:
         """
         Process a complete video file.
 
@@ -112,21 +126,25 @@ class FruitPipeline:
         PipelineResult
             Final counts, yield estimates, and per-frame stats.
         """
-        # TODO: Implement during Phase 5
-        # 1. Open video with VideoProcessor
-        # 2. Get frame dimensions and fps → build LineZone → build FruitCounter
-        # 3. Loop over frames:
-        #    a. track_frame(detector, frame, frame_idx, history)
-        #    b. counter.update(frame_idx, tracked_objects, history)
-        #    c. video_processor.annotate_frame(frame, tracked_objects, counter, line_zone)
-        #    d. Collect confidence scores for distribution chart
-        # 4. Assemble and return PipelineResult
-        raise NotImplementedError
+        result = None
+        # Exhaust the shared generator; discard intermediate frames.
+        for _annotated_frame, _frame_stats, _partial_result in self._process_video(
+            video_path, output_path
+        ):
+            result = _partial_result  # updated each frame; last value is final
+
+        # _process_video always yields at least a sentinel — result is never None
+        # for a non-empty video, but guard defensively.
+        if result is None:
+            raise RuntimeError(f"No frames could be read from {video_path}")
+
+        return result
+
 
     def run_streaming(
         self,
-        video_path: str | Path,
-    ) -> Generator[tuple[np.ndarray, FrameStats], None, PipelineResult]:
+        video_path: str | Path
+        ) -> Generator[tuple[np.ndarray, FrameStats], None, PipelineResult]:
         """
         Process a video frame-by-frame, yielding annotated frames for
         real-time display in the Streamlit app.
@@ -141,5 +159,105 @@ class FruitPipeline:
         PipelineResult
             Final result after the generator is exhausted.
         """
-        # TODO: Implement during Phase 5
-        raise NotImplementedError
+        result = None
+        for annotated_frame, frame_stats, partial_result in self._process_video(
+            video_path, output_path=None
+        ):
+            result = partial_result
+            yield annotated_frame, frame_stats
+
+        if result is None:
+            raise RuntimeError(f"No frames could be read from {video_path}")
+
+        return result
+
+    # ------------------------------------------------------------------
+    # Internal implementation
+    # ------------------------------------------------------------------
+
+    def _build_line_zone(self, width: int, height: int) -> LineZone | None:
+        """
+        Construct the LineZone from config, or return None if M1 is disabled.
+        """
+        if not self.config.enable_m1:
+            return None
+        return LineZone(
+            position=self.config.line_position,
+            orientation=LineOrientation(self.config.line_orientation),
+            frame_width=width,
+            frame_height=height
+        )
+
+    def _process_video(
+        self,
+        video_path: str | Path,
+        output_path: str | Path | None
+        ) -> Generator[tuple[np.ndarray, FrameStats, PipelineResult], None, None]:
+        """
+        Core frame-by-frame generator shared by run() and run_streaming().
+
+        Yields (annotated_frame, frame_stats, partial_result) on every frame.
+        The caller decides whether to collect frames (streaming) or discard
+        them (batch).
+        """
+        cfg = self.config
+
+        # Reset tracker state so this video starts fresh.
+        self.detector.reset_tracker()
+
+        with VideoProcessor(
+            input_path=Path(video_path),
+            output_path=Path(output_path) if output_path else None,
+            output_codec=cfg.output_codec
+        ) as vp:
+            line_zone = self._build_line_zone(vp.width, vp.height)
+            counter = FruitCounter(
+                fps=vp.fps,
+                min_track_frames=cfg.min_track_frames,
+                line_zone=line_zone
+            )
+            history: TrackHistory = {}
+            per_frame_stats: list[FrameStats] = []
+            confidence_scores: list[float] = []
+
+            for frame_idx, frame in vp.read_frames():
+                # 1. Detect + track
+                tracked_objects, history = track_frame(
+                    self.detector, frame, frame_idx, history
+                )
+
+                # 2. Collect confidence scores for the distribution chart
+                for obj in tracked_objects:
+                    confidence_scores.append(obj.confidence)
+
+                # 3. Update counters
+                frame_stats = counter.update(frame_idx, tracked_objects, history)
+                per_frame_stats.append(frame_stats)
+
+                # 4. Annotate frame
+                annotated = vp.annotate_frame(
+                    frame=frame,
+                    tracked_objects=tracked_objects,
+                    track_history=history,
+                    line_zone=line_zone,
+                    count_m1=counter.count_m1,
+                    count_m2=counter.count_m2,
+                    trail_length=cfg.trail_length
+                )
+
+                # 5. Write to output video (no-op if output_path is None)
+                vp.write_frame(annotated)
+
+                # 6. Build partial result and yield
+                partial_result = PipelineResult(
+                    total_frames=frame_idx + 1,
+                    fps=vp.fps,
+                    count_m1=counter.count_m1,
+                    count_m2=counter.count_m2,
+                    estimated_kg_m1=self.yield_estimator.estimate_kg(counter.count_m1),
+                    estimated_kg_m2=self.yield_estimator.estimate_kg(counter.count_m2),
+                    per_frame_stats=per_frame_stats,
+                    confidence_scores=confidence_scores
+                )
+
+                yield annotated, frame_stats, partial_result
