@@ -40,6 +40,8 @@ class PipelineConfig:
     enable_m2: bool = True
     trail_length: int = 30
     output_codec: str = "mp4v"
+    track_high_thresh: float = 0.25
+    tracker_config_path: Path = Path("configs/bytetrack.yaml")
 
     @classmethod
     def from_yaml(cls, config_path: str | Path = "configs/settings.yaml") -> "PipelineConfig":
@@ -57,7 +59,9 @@ class PipelineConfig:
             enable_m1=cfg["counting"]["method1"]["enabled"],
             enable_m2=cfg["counting"]["method2"]["enabled"],
             trail_length=cfg["video"].get("trail_length", 30),
-            output_codec=cfg["video"].get("output_codec", "mp4v")
+            output_codec=cfg["video"].get("output_codec", "mp4v"),
+            track_high_thresh=cfg["tracking"].get("track_high_thresh", 0.25),
+            tracker_config_path=Path(cfg["tracking"]["tracker_config"])
         )
 
 
@@ -94,7 +98,9 @@ class FruitPipeline:
             conf=config.conf,
             iou=config.iou,
             imgsz=config.imgsz,
-            device=config.device
+            device=config.device,
+            track_high_thresh=config.track_high_thresh,
+            tracker_config_path=config.tracker_config_path
         )
         self.yield_estimator = YieldEstimator(config.avg_apple_weight_g)
 
