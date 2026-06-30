@@ -15,4 +15,4 @@ jobs:
           github_repo_id: ${{ github.repository }}
           huggingface_repo_id: matarauj/project_fruit_detection
           hf_token: ${{ secrets.HF_TOKEN }}
-          subdirectory: 'hugging_face_spaces'
+          subdirectory: 'fruit-harvest-mvp'
